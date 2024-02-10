@@ -21,6 +21,7 @@ buildoptions({
 	"-Wconversion",
 	"-Wstrict-prototypes",
 	"-pedantic",
+	"-Wno-format-nonliteral",
 	"-fsanitize=address",
 })
 linkoptions({ "-fsanitize=address" })
