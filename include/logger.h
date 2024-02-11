@@ -2,13 +2,14 @@
 
 typedef enum out_type {
 
-    TERMINAL_OUT,
-    FILE_OUT,
-    ALL_OUT,
+    STDOUT,
+    STDERR,
+    L_FILE,
+    ALL,
 
 } OutType;
 
-void initLogger(OutType type);
+void initLogger(OutType type_flag);
 void terminateLogger(void);
 void logMessage(int level,
                 const int line,
@@ -16,6 +17,7 @@ void logMessage(int level,
                 const char* format,
                 ...);
 
+void setLogFile(const char* file_name);
 #define LOG_DEBUG(format, ...) \
     logMessage(0, __LINE__, __FILE__, format, ##__VA_ARGS__)
 

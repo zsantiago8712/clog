@@ -1,11 +1,11 @@
 #include "logger.h"
 
-// #include <time.h>
 #include <stdio.h>
 #include <sys/time.h>
 
 int main(int argc, char* argv[]) {
-    initLogger(TERMINAL_OUT);
+    initLogger(ALL);
+    setLogFile("test.log");
 
     struct timeval start, end;
     gettimeofday(&start, NULL);
