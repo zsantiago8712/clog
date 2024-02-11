@@ -11,17 +11,6 @@
 #define MAX_TIME_BUFFER_SIZE 64
 #define MAX_QUEUE_LOGS 32
 
-typedef enum {
-
-    LEVEL_DEBUG = 0,
-    LEVEL_INFO = 1,
-    LEVEL_WARNING = 2,
-    LEVEL_ERROR = 3,
-    LEVEL_FATAL = 4,
-
-    LOG_MAX
-} Log_Leves;
-
 typedef struct {
     pthread_mutex_t lock;
     char time_buffer[MAX_TIME_BUFFER_SIZE];
@@ -39,8 +28,8 @@ typedef struct {
 } Logger;
 
 static void formatTime(void);
-static const char* getFormatByLogLevel(Log_Leves level);
-static const char* getFormatByLogLevelForFile(Log_Leves level);
+static const char* getFormatByLogLevel(Log_Level level);
+static const char* getFormatByLogLevelForFile(Log_Level level);
 
 static Logger logger = {
     .output = NULL,
@@ -76,31 +65,33 @@ void initLogger(OutType type_flag) {
 }
 
 void setLogFile(const char* file_name) {
-    if (logger.log_file != NULL) {
-        fclose(logger.log_file);
-    }
+    if (logger.its_initialized &&
+        (logger.type_flag == L_FILE || logger.type_flag == ALL)) {
+        if (logger.log_file != NULL) {
+            fclose(logger.log_file);
+        }
 
-    logger.log_file = fopen(file_name, "w");
-    if (logger.log_file == NULL) {
-        perror("fopen");
-        terminateLogger();
-        exit(-1);
+        logger.log_file = fopen(file_name, "w");
+        if (logger.log_file == NULL) {
+            perror("fopen");
+            terminateLogger();
+            exit(-1);
+        }
     }
 }
 
 void terminateLogger(void) {
     if (logger.its_initialized) {
-        if (logger.output != NULL) {
-            fclose(logger.output);
+        if (logger.log_file != NULL && logger.its_initialized &&
+            (logger.type_flag == L_FILE || logger.type_flag == ALL)) {
+            fclose(logger.log_file);
         }
         logger.its_initialized = 0;
         pthread_mutex_destroy(&logger.lock);
     }
 }
 
-// HACK: Enconrtrear una mejora maneera de implementar los log levels, puede ser
-// que leo mejor sea ponerlos en el header
-void logMessage(int level,
+void logMessage(Log_Level level,
                 const int line,
                 const char* file,
                 const char* format,
@@ -120,39 +111,42 @@ void logMessage(int level,
         assert(logger.log_file != NULL);
 
         snprintf(logger.queue_logs[logger.logs_in_queue++], MAX_BUFFER_SIZE,
-                 getFormatByLogLevelForFile((Log_Leves)level), file, line,
+                 getFormatByLogLevelForFile(level), file, line,
                  logger.time_buffer, log_buffer);
 
         if (logger.logs_in_queue == MAX_QUEUE_LOGS) {
             for (int i = 0; i < MAX_QUEUE_LOGS; i++) {
                 fprintf(logger.log_file, "%s", logger.queue_logs[i]);
-                logger.logs_in_queue--;
             }
+            logger.logs_in_queue = 0;
+            fflush(logger.log_file);
         }
 
-        fprintf(logger.output, getFormatByLogLevel((Log_Leves)level), file,
-                line, logger.time_buffer, log_buffer);
+        fprintf(logger.output, getFormatByLogLevel(level), file, line,
+                logger.time_buffer, log_buffer);
+        fflush(logger.output);
 
     } else if (logger.type_flag == L_FILE) {
         assert(logger.log_file != NULL);
 
         snprintf(logger.queue_logs[logger.logs_in_queue++], MAX_BUFFER_SIZE,
-                 getFormatByLogLevelForFile((Log_Leves)level), file, line,
+                 getFormatByLogLevelForFile((Log_Level)level), file, line,
                  logger.time_buffer, log_buffer);
 
         if (logger.logs_in_queue == MAX_QUEUE_LOGS) {
             for (int i = 0; i < MAX_QUEUE_LOGS - 1; i++) {
                 fprintf(logger.log_file, "%s", logger.queue_logs[i]);
-                logger.logs_in_queue--;
             }
+            logger.logs_in_queue = 0;
+            fflush(logger.log_file);
         }
     } else {
-        fprintf(logger.output, getFormatByLogLevel((Log_Leves)level), file,
-                line, logger.time_buffer, log_buffer);
+        fprintf(logger.output, getFormatByLogLevel(level), file, line,
+                logger.time_buffer, log_buffer);
+        fflush(logger.output);
     }
 
     pthread_mutex_unlock(&logger.lock);
-    fflush(stderr);
 }
 
 #define WITH_COLORS
@@ -163,13 +157,15 @@ static void formatTime(void) {
 
     if (time_now != logger.last_time) {
         struct tm* time = localtime(&time_now);
-        strftime(logger.time_buffer, MAX_TIME_BUFFER_SIZE, "%Y-%m-%d %H:%M:%S",
-                 time);
-        logger.last_time = time_now;
+        if (logger.last_time != time->tm_sec) {
+            strftime(logger.time_buffer, MAX_TIME_BUFFER_SIZE,
+                     "%Y-%m-%d %H:%M:%S", time);
+            logger.last_time = time_now;
+        }
     }
 }
 
-static const char* getFormatByLogLevel(Log_Leves level) {
+static const char* getFormatByLogLevel(Log_Level level) {
     switch (level) {
         case LEVEL_DEBUG:
 #ifdef WITH_COLORS
@@ -213,7 +209,7 @@ static const char* getFormatByLogLevel(Log_Leves level) {
     return "[Line: %d] [File: %s] [Time: %s] -> \n";
 }
 
-static const char* getFormatByLogLevelForFile(Log_Leves level) {
+static const char* getFormatByLogLevelForFile(Log_Level level) {
     switch (level) {
         case LEVEL_DEBUG:
             return "[DEBUG] [File: %s] [Line: %d] [Time: %s] -> %s\n";
