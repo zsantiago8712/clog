@@ -1,10 +1,11 @@
+
 #include "logger.h"
 
 #include <stdio.h>
 #include <sys/time.h>
 
 int main(int argc, char* argv[]) {
-    initLogger(ALL);
+    initLogger(STDERR);
     setLogFile("test.log");
 
     struct timeval start, end;

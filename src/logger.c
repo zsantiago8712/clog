@@ -55,6 +55,7 @@ void initLogger(OutType type_flag) {
                 setLogFile("clog.log");
                 break;
             case ALL:
+#define WITH_COLORS
                 logger.output = stderr;
                 setLogFile("clog.log");
                 break;
@@ -148,8 +149,6 @@ void logMessage(Log_Level level,
 
     pthread_mutex_unlock(&logger.lock);
 }
-
-#define WITH_COLORS
 
 // -------------------STATIC FUNCTIONS--------------------
 static void formatTime(void) {
